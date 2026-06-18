@@ -3,3 +3,7 @@ matplotlib
 numpy
 pandas
 scikit-learn
+fastapi
+httpx
+pytest
+uvicorn

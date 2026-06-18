@@ -59,24 +59,36 @@ Reason:
 
 ```text
 kkbox-churn/
-├── data/
-│   ├── raw/
-│   └── processed/
-├── models/
-├── notebooks/
-├── reports/
-├── src/
-│   ├── features/
-│   │   └── build_features.py
-│   └── models/
-│       ├── train_model.py
-│       └── predict.py
-├── .gitignore
-├── README.md
-└── requirements.txt
+|-- data/
+|   |-- raw/
+|   `-- processed/
+|-- examples/
+|   |-- create_sample_request.py
+|   `-- sample_request.json
+|-- models/
+|   `-- hgb_churn_model_v1.joblib
+|-- notebooks/
+|-- reports/
+|-- src/
+|   |-- api/
+|   |   |-- main.py
+|   |   `-- schemas.py
+|   |-- features/
+|   |   `-- build_features.py
+|   `-- models/
+|       |-- train_model.py
+|       `-- predict.py
+|-- test_api/
+|   `-- test_api.py
+|-- .dockerignore
+|-- .gitignore
+|-- Dockerfile
+|-- README.md
+|-- requirements-api.txt
+`-- requirements.txt
 ```
 
-Raw data, processed CSVs, and model artifacts are excluded from Git.
+Raw data and processed CSVs are excluded from Git. The selected 579 KB model artifact is included because the API requires it at runtime.
 
 ## Main Workflow
 
@@ -97,6 +109,105 @@ Generate predictions:
 ```bash
 python src/models/predict.py
 ```
+
+## FastAPI Model Service
+
+Version 1 includes a FastAPI service around the saved HGB model.
+
+Available endpoints:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/health` | Confirm the API and model are available |
+| POST | `/predict` | Score one customer |
+| POST | `/predict-batch` | Score 1 to 1,000 customers |
+
+The API returns churn probability, selected threshold, predicted class, risk band, and suggested retention action.
+
+Important limitation:
+
+The API expects the 30 engineered model features. It does not build features directly from raw transaction history.
+
+### Run Locally
+
+Install dependencies:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Start the development server:
+
+```powershell
+python -m uvicorn src.api.main:app --reload
+```
+
+Open:
+
+- API documentation: `http://127.0.0.1:8000/docs`
+- Health check: `http://127.0.0.1:8000/health`
+
+### Example Prediction
+
+```powershell
+$body = Get-Content examples\sample_request.json -Raw
+
+Invoke-RestMethod `
+    -Uri http://127.0.0.1:8000/predict `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $body
+```
+
+Example response:
+
+```json
+{
+  "churn_probability": 0.4943,
+  "prediction_threshold": 0.13,
+  "predicted_churn": 1,
+  "risk_band": "30-60%",
+  "suggested_action": "moderate_retention_offer"
+}
+```
+
+## Automated API Tests
+
+Run:
+
+```powershell
+python -m pytest -v
+```
+
+The tests cover health, valid prediction, invalid input, batch prediction, and empty-batch rejection.
+
+Current result:
+
+```text
+5 passed
+```
+
+## Docker
+
+Build the API image:
+
+```powershell
+docker build -t kkbox-churn-api:v1 .
+```
+
+Run the container:
+
+```powershell
+docker run --rm -p 8000:8000 --name kkbox-churn-api kkbox-churn-api:v1
+```
+
+Verify it from another terminal:
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8000/health
+```
+
+The Docker container was verified successfully using both `/health` and `/predict`.
 
 ## Feature Engineering
 
@@ -220,6 +331,8 @@ Version 1 limitations:
 - cost values are normalized assumptions, not confirmed business finance numbers
 - encoded categories such as city and registration channel are not decoded
 - extreme expiration-date values exist and should be cleaned more carefully in a future version
+- the API accepts engineered features rather than raw customer transaction history
+- Docker is verified locally but is not yet hosted on a public cloud service
 
 ## Next Improvements
 
@@ -229,5 +342,6 @@ Potential version 2 improvements:
 - clean extreme expiration-date features more carefully
 - compare performance with and without dominant timing features
 - add feature importance plots
-- add a Streamlit or FastAPI scoring demo
-- write a final business-facing report
+- deploy the Docker container to a public cloud service
+- add a small Streamlit interface that calls the API
+- add authentication, logging, and monitoring for a production-style version

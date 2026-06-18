@@ -6,6 +6,7 @@ data/raw/
 data/processed/*.csv
 
 models/*.joblib
+!models/hgb_churn_model_v1.joblib
 
 *.7z
 *.zip
