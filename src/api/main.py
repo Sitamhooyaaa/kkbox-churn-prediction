@@ -32,6 +32,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.get("/")
+def root():
+    return {
+        "service": "kkbox-churn-prediction",
+        "status": "online",
+        "health": "/health",
+        "documentation": "/docs",
+    }
 
 @app.get("/health")
 def health_check():

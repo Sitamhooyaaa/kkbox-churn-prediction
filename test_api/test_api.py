@@ -92,3 +92,10 @@ def test_empty_batch_is_rejected(client):
     )
 
     assert response.status_code == 422
+
+def test_root_endpoint(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "online"
+    assert response.json()["documentation"] == "/docs"
